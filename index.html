@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ChienY. Workshop 鉤織配色</title>
+
+    <!-- PWA / iPhone Web App -->
+    <meta name="theme-color" content="#92400E">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ChienY.配色">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="apple-touch-icon" href="./icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { padding-top: env(safe-area-inset-top); }
+        .swatch-texture {
+            position: relative;
+            overflow: hidden;
+        }
+        .swatch-texture::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: .24;
+            background-image:
+                repeating-linear-gradient(0deg, rgba(255,255,255,.75) 0 1px, transparent 1px 5px),
+                repeating-linear-gradient(90deg, rgba(0,0,0,.12) 0 1px, transparent 1px 6px);
+            mix-blend-mode: soft-light;
+        }
+        .modal-scroll { max-height: calc(100vh - 2rem); overflow-y: auto; }
+    </style>
+</head>
+<body class="bg-[#FAF7F2] text-stone-700 font-sans antialiased min-h-screen pb-16 selection:bg-amber-200">
+
+    <!-- App 頂部導覽列 -->
+    <header class="sticky top-0 z-40 bg-[#FAF7F2]/90 backdrop-blur-md border-b border-amber-100 px-4 py-3">
+        <div class="max-w-2xl mx-auto flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 min-w-0">
+                <div class="w-8 h-8 rounded-full bg-amber-800 flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">🧶</div>
+                <div class="min-w-0">
+                    <h1 class="font-bold text-stone-800 text-base leading-tight truncate">ChienY. Workshop 鉤織配色</h1>
+                    <p id="cloudStatus" class="text-[10px] text-stone-400 font-medium">尚未設定雲端</p>
+                </div>
+            </div>
+            <button onclick="openConfigModal()" class="text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 px-2.5 py-1.5 rounded-lg border border-amber-300/50 transition shrink-0">
+                ⚙️ 雲端設定
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-2xl mx-auto px-4 py-4 space-y-5">
+
+        <div class="bg-gradient-to-r from-amber-100/80 to-orange-100/60 rounded-xl p-3 border border-amber-200/60 shadow-xs flex items-center gap-2.5">
+            <span class="bg-amber-800 text-amber-100 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">NEW</span>
+            <p class="text-xs text-amber-900 leading-relaxed">
+                色票與配色建議改用織片質感呈現，更貼近實際鉤出來的毛線與包款質感！
+            </p>
+        </div>
+
+        <!-- 1. 雲端色票庫 -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-stone-200/80">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-bold text-stone-800 text-base flex items-center gap-1.5">
+                    <span class="w-1.5 h-4 bg-amber-700 rounded-full inline-block"></span>
+                    色票庫 (雲端同步)
+                </h2>
+                <span id="colorCount" class="text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">0 色</span>
+            </div>
+
+            <div id="swatchList" class="flex gap-2.5 overflow-x-auto no-scrollbar py-1 min-h-[100px] items-stretch">
+                <p class="text-xs text-stone-400 w-full text-center py-8">請先設定 Supabase 雲端空間</p>
+            </div>
+
+            <div class="mt-3 grid grid-cols-2 gap-2">
+                <label class="cursor-pointer flex items-center justify-center gap-1.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-medium py-2.5 px-3 rounded-xl shadow-xs transition">
+                    📸 上傳毛線照片
+                    <input type="file" id="imageUploader" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                </label>
+                <button onclick="toggleAddColorForm()" class="flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-medium py-2.5 px-3 rounded-xl transition">
+                    ➕ 手動新增色票
+                </button>
+            </div>
+
+            <form id="addColorForm" class="hidden mt-3 p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-2.5" onsubmit="saveNewColor(event)">
+                <div class="flex gap-2">
+                    <input type="text" id="newColorName" placeholder="毛線名稱/色號 (例: 燕麥奶)" required class="flex-1 min-w-0 text-xs border border-stone-300 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    <input type="color" id="newColorHex" value="#D4A373" class="w-10 h-9 border border-stone-300 rounded-lg p-0.5 bg-white cursor-pointer shrink-0">
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="toggleAddColorForm(false)" class="text-xs px-3 py-1.5 text-stone-500 hover:bg-stone-200 rounded-lg">取消</button>
+                    <button type="submit" class="text-xs bg-amber-700 text-white px-3 py-1.5 rounded-lg hover:bg-amber-800">儲存至雲端</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- 2. 手動配色 -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-stone-200/80 space-y-3">
+            <h2 class="font-bold text-stone-800 text-base flex items-center gap-1.5">
+                <span class="w-1.5 h-4 bg-amber-700 rounded-full inline-block"></span>
+                手動配色
+            </h2>
+            <ul class="text-xs text-stone-500 space-y-1 list-disc pl-4">
+                <li>選主色 + 想要的顏色數量，系統依色彩理論從妳的色票庫挑選最接近的實際毛線色</li>
+                <li>配色結果會直接顯示雲端色票庫裡現有的顏色</li>
+            </ul>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                <div>
+                    <label class="block text-[11px] font-medium text-stone-600 mb-1">主色 (從色票庫選)</label>
+                    <select id="mainColorSelect" class="w-full text-xs border border-stone-300 rounded-lg p-2 bg-stone-50 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                        <option value="">請先選擇主色</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-medium text-stone-600 mb-1">想要幾色 (含主色)</label>
+                    <select id="colorCountSelect" class="w-full text-xs border border-stone-300 rounded-lg p-2 bg-stone-50 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                        <option value="2">2 色</option>
+                        <option value="3">3 色</option>
+                        <option value="4">4 色</option>
+                        <option value="5">5 色</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-medium text-stone-600 mb-1">配色理論</label>
+                    <select id="theorySelect" class="w-full text-xs border border-stone-300 rounded-lg p-2 bg-stone-50 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                        <option value="complementary">互補色 (對比色)</option>
+                        <option value="analogous">鄰近色 (柔和)</option>
+                        <option value="monochromatic">同色系漸層</option>
+                        <option value="triadic">三等分對比</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="generateManualPalette()" class="w-full bg-amber-200 hover:bg-amber-300 text-amber-900 font-medium text-xs py-2.5 rounded-xl border border-amber-300 transition shadow-2xs">
+                產生配色建議
+            </button>
+
+            <div id="manualResult" class="hidden mt-3 p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-2">
+                <p class="text-xs font-bold text-stone-700">配色推薦成果：</p>
+                <div id="manualResultPalette" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
+            </div>
+        </section>
+
+        <!-- 3. 自動配對 -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-stone-200/80 space-y-3">
+            <h2 class="font-bold text-stone-800 text-base flex items-center gap-1.5">
+                <span class="w-1.5 h-4 bg-amber-700 rounded-full inline-block"></span>
+                自動配對建議
+            </h2>
+            <p class="text-xs text-stone-500">不用選主色，系統自動從現有色票找出一組協調的搭配。</p>
+
+            <div class="flex items-center gap-3">
+                <div class="flex-1">
+                    <input type="number" id="autoColorNum" min="2" max="5" value="3" placeholder="想要搭配幾種顏色 (2-5)" class="w-full text-xs border border-stone-300 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                </div>
+                <button onclick="generateAutoPalette()" class="bg-amber-200 hover:bg-amber-300 text-amber-900 font-medium text-xs px-4 py-2.5 rounded-xl border border-amber-300 transition shadow-2xs shrink-0">
+                    產生配色建議
+                </button>
+            </div>
+
+            <div id="autoResult" class="hidden mt-3 p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-2">
+                <p class="text-xs font-bold text-stone-700">自動推薦組合：</p>
+                <div id="autoResultPalette" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
+            </div>
+        </section>
+
+        <footer class="text-center text-[11px] text-stone-400 space-y-1 pt-4">
+            <p>© ChienY. Workshop 版權所有</p>
+            <p>iPhone：Safari → 分享 → 加入主畫面，即可當 App 使用</p>
+        </footer>
+    </main>
+
+    <!-- Supabase 設定 Modal -->
+    <div id="configModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div class="modal-scroll bg-white rounded-2xl p-5 max-w-md w-full space-y-4 shadow-xl">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h3 class="font-bold text-stone-800 text-base">☁️ 設定自己的 Supabase</h3>
+                    <p class="text-xs text-stone-500 leading-relaxed mt-1">第一次設定一次即可。URL 與 Anon Key 只會存在這台裝置的瀏覽器，不會寫進 GitHub。</p>
+                </div>
+                <button id="configCloseButton" onclick="closeConfigModal()" class="hidden text-stone-400 hover:text-stone-700 text-xl leading-none">×</button>
+            </div>
+
+            <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[11px] text-amber-900 leading-relaxed">
+                請使用 <b>Anon / Publishable Key</b>。不要把 <b>Service Role / Secret Key</b> 填進來。
+            </div>
+
+            <div class="space-y-2.5">
+                <div>
+                    <label class="block text-[11px] font-medium text-stone-600 mb-1">Project URL</label>
+                    <input type="url" id="supabaseUrlInput" autocomplete="off" placeholder="https://xxxx.supabase.co" class="w-full text-xs border border-stone-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-medium text-stone-600 mb-1">Anon / Publishable Key</label>
+                    <textarea id="supabaseKeyInput" rows="4" autocomplete="off" spellcheck="false" placeholder="貼上 Supabase 的 Anon / Publishable Key" class="w-full text-[11px] font-mono border border-stone-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none"></textarea>
+                </div>
+            </div>
+
+            <p id="configMessage" class="hidden text-xs rounded-lg px-3 py-2"></p>
+
+            <div class="grid grid-cols-1 gap-2">
+                <button id="saveConfigButton" onclick="saveSupabaseConfig()" class="w-full bg-amber-700 hover:bg-amber-800 text-white text-xs font-medium py-2.5 rounded-xl transition">
+                    測試連線並儲存
+                </button>
+                <button id="clearConfigButton" onclick="clearSupabaseConfig()" class="hidden w-full bg-stone-100 hover:bg-stone-200 text-stone-600 text-xs font-medium py-2.5 rounded-xl transition">
+                    清除這台裝置的雲端設定
+                </button>
+            </div>
+
+            <p class="text-[10px] text-stone-400 leading-relaxed">如果顯示找不到 <code>colors</code> 資料表，請先在 Supabase 執行專案附帶的 <code>supabase-setup.sql</code>。</p>
+        </div>
+    </div>
+
+    <!-- 照片新增色票 Modal -->
+    <div id="photoModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div class="modal-scroll bg-white rounded-2xl p-5 max-w-md w-full space-y-4 shadow-xl">
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-stone-800 text-base">📸 從毛線照片新增色票</h3>
+                <button onclick="closePhotoModal()" class="text-stone-400 hover:text-stone-700 text-xl leading-none">×</button>
+            </div>
+
+            <img id="photoPreview" alt="毛線照片預覽" class="w-full h-52 object-cover rounded-xl border border-stone-200 bg-stone-100">
+
+            <div class="space-y-2.5">
+                <div>
+                    <label class="block text-[11px] font-medium text-stone-600 mb-1">毛線名稱 / 色號</label>
+                    <input type="text" id="photoColorName" placeholder="例：焦糖棕 05" class="w-full text-xs border border-stone-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-medium text-stone-600 mb-1">從照片估算的主色（可以手動調整）</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" id="photoColorHex" value="#D4A373" class="w-12 h-10 border border-stone-300 rounded-lg p-0.5 bg-white cursor-pointer">
+                        <span id="photoHexText" class="text-xs font-mono text-stone-600">#D4A373</span>
+                    </div>
+                </div>
+            </div>
+
+            <button id="savePhotoButton" onclick="savePhotoColor()" class="w-full bg-amber-700 hover:bg-amber-800 text-white text-xs font-medium py-2.5 rounded-xl transition">
+                上傳照片並儲存色票
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="hidden fixed left-1/2 -translate-x-1/2 bottom-6 z-[60] max-w-[90vw] rounded-xl bg-stone-900 text-white text-xs px-4 py-3 shadow-xl"></div>
+
+    <script src="./app.js"></script>
+    <script src="./pwa-register.js"></script>
+</body>
+</html>

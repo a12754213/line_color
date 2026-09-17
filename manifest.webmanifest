@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "ChienY. Workshop 鉤織配色",
+  "short_name": "ChienY.配色",
+  "description": "ChienY. Workshop 鉤織配色工具，支援私人 Supabase 雲端色票、毛線照片與配色建議。",
+  "lang": "zh-TW",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FAF7F2",
+  "theme_color": "#92400E",
+  "categories": ["design", "utilities"],
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
